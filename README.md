@@ -1,7 +1,10 @@
-# nyc-sonar-reporter
-A reporter plugin for nyc to produce generic test output for use in SonarQube
+# mocha-sonar-reporter
+A reporter plugin for mocha to produce generic test output for use in SonarQube
 
+# Install
+`npm i mocha-sonar-reporter`
 
+# Output Format
 ```
 <testExecutions version="1">
   <file path="testx/ClassOneTest.xoo">
