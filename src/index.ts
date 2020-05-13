@@ -1,70 +1,67 @@
 // mocha-sonar-reporter.js
 'use strict';
 
-import { Runner, Suite, Test } from 'mocha';
-const {
-    EVENT_RUN_BEGIN,
-    EVENT_RUN_END,
-    EVENT_TEST_PENDING,
-    EVENT_TEST_FAIL,
-    EVENT_TEST_PASS,
-    EVENT_SUITE_BEGIN,
-    EVENT_SUITE_END,
-} = Runner.constants;
+import { Runner, Suite, Test, reporters } from 'mocha';
 
-// this reporter outputs test results, indenting two spaces per suite
-class SonarReporter {
-    private _indents: number = 0;
+/*
+    TO DO:
+        On start, open testExecutions
+        On end, close testExecutions
+
+        On suite end, just iterate everything in the suite and spit it out
+        Doing it test by test doesn't seem to be playing nice with how Mocha reports the test done
+        we're better off just iterating the suite when its done
+*/
+
+export class SonarReporter {
+    private indents: number = 0;
     constructor(runner: Runner) {
+        reporters.Base.call(this, runner);
 
         runner
-            .once(EVENT_RUN_BEGIN, () => {
-                console.log(`<testExecutions version="1">`);
-                this.increaseIndent();
+            .once('start', () => {
+                this.write(`<testExecutions version="1">`);
+                ++this.indents;
             })
-            .on(EVENT_SUITE_BEGIN, (suite: Suite) => {
-                console.log(`${this.indent()}<file path="${suite.fullTitle()}">`);
-                this.increaseIndent();
-            })
-            .on(EVENT_SUITE_END, () => {
-                this.decreaseIndent();
-                console.log(`${this.indent()}</file>`);
-            })
-            .on(EVENT_TEST_PASS, (test: Test) => {
-                if (test.speed === 'fast') {
-                    console.log(`${this.indent()}<testCase name="${test.title}" duration="0"/>`);
-                } else {
-                    console.log(`${this.indent()}<testCase name="${test.title}" duration="${test.duration}"/>`);
+            .on('suite', (suite: Suite) => {
+                if (suite.tests.length > 0) {
+                    this.write(`<file path="${suite.file}">`);
+                    ++this.indents;
                 }
             })
-            .on(EVENT_TEST_PENDING, (test: Test) => {
-                console.log(`${this.indent()}<testCase name="${test.title}" duration="0">`);
-                this.increaseIndent();
-                console.log(`${this.indent()}<skipped message="pending">Test is Pending</skipped>`);
-                this.decreaseIndent();
+            .on('suite end', (suite: Suite) => {
+                if (suite.tests.length > 0) {
+                    --this.indents;
+                    this.write(`</file>`);
+                }
             })
-            .on(EVENT_TEST_FAIL, (test: Test, err: Error) => {
-                console.log(`${this.indent()}<testCase name="${test.title}" duration="0">`);
-                this.increaseIndent();
-                console.log(`${this.indent()}<failure message="${err.message}">${err.stack}</failure>`);
-                this.decreaseIndent();
+            .on('pass', (test: Test) => {
+                this.write(`<testCase name="${test.title}" duration="${test.duration}"/>`);
             })
-            .once(EVENT_RUN_END, () => {
-                this.decreaseIndent();
-                console.log(`</testExecutions>`);
+            .on('pending', (test: Test) => {
+                this.write(`<testCase name="${test.title}" duration="0">`);
+                ++this.indents;
+                this.write(`<skipped message="pending">Test is Pending</skipped>`);
+                --this.indents;
+            })
+            .on('fail', (test: Test, err: Error) => {
+                this.write(`<testCase name="${test.title}" duration="0">`);
+                ++this.indents;
+                this.write(`<failure message="${err.message}">${err.stack}</failure>`);
+                --this.indents;
+            })
+            .once('end', () => {
+                --this.indents;
+                this.write(`</testExecutions>`);
             });
     }
 
+    private write(message: string) {
+        console.log(`${this.indent()}${message}`);
+    }
+
     private indent() {
-        return Array(this._indents).join('  ');
-    }
-
-    private increaseIndent() {
-        this._indents++;
-    }
-
-    private decreaseIndent() {
-        this._indents--;
+        return Array(this.indents).join('  ');
     }
 }
 
